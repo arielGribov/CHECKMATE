@@ -11,6 +11,7 @@ namespace CHECKMATE
     class GamePlay
     {
         Board boardGame = new Board();
+        Board[] threeLastBoards = new Board[3];
         bool color = true;
         static int counterUpTo50Moves;
         public void Play()
@@ -58,7 +59,7 @@ namespace CHECKMATE
                 }
 
                 //making a move if legal/ trying again
-                while (!boardGame.moveTool(boardGame, input[0], int.Parse(input[1] + ""), input[2], int.Parse(input[3] + ""), color))
+                while (!makeAMoveIfPossible(boardGame, input[0], int.Parse(input[1] + ""), input[2], int.Parse(input[3] + ""), color))
                 {
                     Console.WriteLine("illegal move please try again :");
                     Console.WriteLine((color ? "White" : "Black") + " player please enter a move:");
@@ -73,7 +74,7 @@ namespace CHECKMATE
                         input = input.Replace(" ", "").ToUpper();
                     }
                 }
-                if (isPat() || isLackOfMoves() || getCounter() >= 50)
+                if (isPat() || isLackOfMoves() || getCounterUpTo50Moves() >= 50 || isThreefoldRepetition())
                 {
                     Console.WriteLine("It's a draw !");
                     return;
@@ -81,11 +82,50 @@ namespace CHECKMATE
                 if (isChess(boardGame, !color))
                     Console.WriteLine("It's {0} chess", color ? "White" : "Black");
                 color = !color;
-            } while (!isWin(boardGame, color));
+            } while (!isWin());
             Console.WriteLine("Congrats the {0} player win!", color ? "Black" : "White");
             return;
         }
-        //check if there is check and returns the location of the tool that threat the king
+        public bool isThreefoldRepetition()
+        {
+            if(threeLastBoards[2]==null || threeLastBoards[1]==null)
+                return false;
+            threeLastBoards[2] = threeLastBoards[1].copy();
+            threeLastBoards[1] = threeLastBoards[0].copy();
+            threeLastBoards[0] = boardGame.copy();
+            if (threeLastBoards[1] == null || threeLastBoards[2] == null)
+                return false;
+            for (int i = 1; i <= 8; i++)
+            {
+                for (char j = 'A'; j <= 'H'; j++)
+                {
+                    if (threeLastBoards[0].getToolInCell(j, i) != threeLastBoards[1].getToolInCell(j, i) || threeLastBoards[0].getToolInCell(j, i) != threeLastBoards[2].getToolInCell(j, i))
+                        return false;
+                    if (threeLastBoards[0].getToolInCell(j, i) is Rook)
+                    {
+                        if (((Rook)threeLastBoards[0].getToolInCell(j, i)).getIsMoved() != ((Rook)threeLastBoards[1].getToolInCell(j, i)).getIsMoved() || ((Rook)threeLastBoards[0].getToolInCell(j, i)).getIsMoved() != ((Rook)threeLastBoards[2].getToolInCell(j, i)).getIsMoved())
+                          return false;
+                    }
+                    if (threeLastBoards[0].getToolInCell(j, i) is King)
+                    {
+                        if (((King)threeLastBoards[0].getToolInCell(j, i)).getIsMoved() != ((King)threeLastBoards[1].getToolInCell(j, i)).getIsMoved() || ((King)threeLastBoards[0].getToolInCell(j, i)).getIsMoved() != ((King)threeLastBoards[2].getToolInCell(j, i)).getIsMoved())
+                            return false;
+                    }
+                    if (threeLastBoards[0].getToolInCell(j, i) is Pawn)
+                    {
+                        for (int x = 1; x <= 8; x++)
+                        {
+                            for (char y = 'A'; y <= 'H'; y++)
+                            {
+                                if(((Pawn)threeLastBoards[0].getToolInCell(j, i)).enPassant(boardGame,j,i,y,x)!=((Pawn)threeLastBoards[1].getToolInCell(j, i)).enPassant(boardGame, j, i, y, x)|| ((Pawn)threeLastBoards[0].getToolInCell(j, i)).enPassant(boardGame, j, i, y, x) != ((Pawn)threeLastBoards[2].getToolInCell(j, i)).enPassant(boardGame, j, i, y, x))
+                                    return false;
+                            }
+                        }
+                    }
+                }
+            }
+            return true;
+        }
         public static bool isChess(Board board, bool color)
         {
             King king = findKing(board, color);
@@ -126,59 +166,39 @@ namespace CHECKMATE
             }
             return null;
         }
-        public static bool isWin(Board board, bool color)
+        public bool isWin()
         {
-            if (isChess(board, color))
-            {
-                for (int x = 1; x <= 8; x++)
-                {
-                    for (char y = 'A'; y <= 'H'; y++)
-                    {
-                        for (int i = 1; i <= 8; i++)
-                        {
-                            for (char j = 'A'; j <= 'H'; j++)
-                            {
-                                if (board.getToolInCell(y, x) != null)
-                                {
-                                    if (board.getToolInCell(y, x).isMoveLegal(board, y, x, j, i))
-                                    {
-                                        if (board.getToolInCell(y, x).getColor() == color)
-                                        {
-                                            if (!board.isStillInChessMode(board, y, x, j, i, color))
-                                                return false;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                return true;
-            }
+            if (isChess(boardGame, color))
+                return runThroughAllBoard();
             return false;
         }
         public bool isPat()
         {
             if (!isChess(boardGame, color) && !isChess(boardGame, !color))
             {
-                if (!isWin(boardGame, color))
+                if (!isWin())
+                    return runThroughAllBoard();
+            }
+            return false;
+        }
+        public bool runThroughAllBoard()
+        {
+            for (int i = 1; i <= 8; i++)
+            {
+                for (char j = 'A'; j <= 'H'; j++)
                 {
-                    for (int i = 1; i <= 8; i++)
+                    for (int x = 1; x <= 8; x++)
                     {
-                        for (char j = 'A'; j <= 'H'; j++)
+                        for (char y = 'A'; y <= 'H'; y++)
                         {
-                            for (int x = 1; x <= 8; x++)
+                            if (boardGame.getToolInCell(j, i) != null)
                             {
-                                for (char y = 'A'; y <= 'H'; y++)
+                                if (boardGame.getToolInCell(j, i).isMoveLegal(boardGame, j, i, y, x))
                                 {
-                                    if (boardGame.getToolInCell(j, i) != null)
+                                    if (boardGame.getToolInCell(j, i).getColor() == color)
                                     {
-                                        if (boardGame.getToolInCell(j, i).isMoveLegal(boardGame, j, i, y, x))
-                                        {
-                                            if (boardGame.isStillInChessMode(boardGame, j, i, y, x, color))
-                                                return false;
-                                            return true;
-                                        }
+                                        if (!isStillInChessMode(boardGame, j, i, y, x, color))
+                                            return false;
                                     }
                                 }
                             }
@@ -186,7 +206,7 @@ namespace CHECKMATE
                     }
                 }
             }
-            return false;
+            return true;
         }
         public bool isLackOfMoves()
         {
@@ -218,8 +238,8 @@ namespace CHECKMATE
             }
             return false;
         }
-        public static int getCounter() { return counterUpTo50Moves; }
-        public static void setCounter(int counter) { counterUpTo50Moves = counter; }
+        public static int getCounterUpTo50Moves() { return counterUpTo50Moves; }
+        public static void setCounterUpTo50Moves(int counter) { counterUpTo50Moves = counter; }
         public static bool isEaten(Board board, char currentLetter, int currentDigit, char nextLetter, int nextDigit)
         {
             if (board.getToolInCell(currentLetter, currentDigit).isMoveLegal(board, currentLetter, currentDigit, nextLetter, nextDigit))
@@ -228,6 +248,82 @@ namespace CHECKMATE
                     return true;
             }
             return false;
+        }
+        public bool isStillInChessMode(Board boardGame, char currentLetter, int currentDigit, char nextLetter, int nextDigit, bool color)
+        {
+            Tool lastToolSave, toolEaten;
+            bool holdPreviousIsMoved = false, result;
+            string tempLocation;
+            int tempCounter;
+            //hold all data to restore and move the tool
+            lastToolSave = boardGame.getLastToolMoved();
+            tempLocation = boardGame.getToolInCell(currentLetter, currentDigit).getLocation();
+            if (boardGame.getToolInCell(currentLetter, currentDigit) is Rook)
+                holdPreviousIsMoved = ((Rook)boardGame.getToolInCell(currentLetter, currentDigit)).getIsMoved();
+            if (boardGame.getToolInCell(currentLetter, currentDigit) is King)
+                holdPreviousIsMoved = ((King)boardGame.getToolInCell(currentLetter, currentDigit)).getIsMoved();
+            toolEaten = boardGame.getToolInCell(nextLetter, nextDigit);
+            tempCounter = getCounterUpTo50Moves();
+            boardGame.getToolInCell(currentLetter, currentDigit).MoveTool(boardGame, currentLetter, currentDigit, nextLetter, nextDigit);
+            //check if still chess
+            result = isChess(boardGame, color);
+            //bringing everything back
+            boardGame.getToolInCell(nextLetter, nextDigit).MoveTool(boardGame, nextLetter, nextDigit, currentLetter, currentDigit);
+            setCounterUpTo50Moves(tempCounter);
+            boardGame.setToolInCell(nextLetter, nextDigit, toolEaten);
+            boardGame.setLastToolMoved(lastToolSave);
+            boardGame.getToolInCell(currentLetter, currentDigit).setLocation(tempLocation);
+            if (boardGame.getToolInCell(currentLetter, currentDigit) is Rook)
+                ((Rook)boardGame.getToolInCell(currentLetter, currentDigit)).setIsMoved(holdPreviousIsMoved);
+            if (boardGame.getToolInCell(currentLetter, currentDigit) is King)
+                ((King)boardGame.getToolInCell(currentLetter, currentDigit)).setIsMoved(holdPreviousIsMoved);
+            if (boardGame.getToolInCell(currentLetter, currentDigit) is Pawn)
+                ((Pawn)boardGame.getToolInCell(currentLetter, currentDigit)).setNumberOfTimesMoved(((Pawn)boardGame.getToolInCell(currentLetter, currentDigit)).getNumberOfTimesMoved() - 2);
+            return result;
+        }
+        // Return false on failure
+        public bool makeAMoveIfPossible(Board boardGame, char currentLetter, int currentDigit, char nextLetter, int nextDigit, bool color)
+        {
+            bool tempIsMoved = false;
+            if (currentLetter < 'A' || currentLetter > 'H' || nextLetter < 'A' || nextLetter > 'H')
+                return false;
+            if (currentDigit < 0 || currentDigit > 8 || nextDigit < 0 || nextDigit > 8)
+                return false;
+            Tool currentTool = boardGame.getToolInCell(currentLetter, currentDigit);
+            if (currentTool == null)
+                return false;
+            if (boardGame.getToolInCell(nextLetter, nextDigit) != null)
+            {
+                if (boardGame.getToolInCell(currentLetter, currentDigit).getColor() == boardGame.getToolInCell(nextLetter, nextDigit).getColor())
+                    return false;
+            }
+            if (boardGame.getToolInCell(currentLetter, currentDigit).getColor() != color)
+                return false;
+            if (!currentTool.isMoveLegal(boardGame, currentLetter, currentDigit, nextLetter, nextDigit))
+                return false;
+            if (isStillInChessMode(boardGame, currentLetter, currentDigit, nextLetter, nextDigit, color))
+                return false;
+            Tool lastToolSave = boardGame.getLastToolMoved();
+            if (currentTool is Rook)
+                tempIsMoved = ((Rook)currentTool).getIsMoved();
+            if (currentTool is King)
+                tempIsMoved = ((King)currentTool).getIsMoved();
+            currentTool.MoveTool(boardGame, currentLetter, currentDigit, nextLetter, nextDigit);
+            boardGame.setLastToolMoved(currentTool);
+            if (isChess(boardGame, color))
+            {
+                currentTool.MoveTool(boardGame, nextLetter, nextDigit, currentLetter, currentDigit);
+                boardGame.setLastToolMoved(lastToolSave);
+                if (currentTool is Rook)
+                    ((Rook)currentTool).setIsMoved(tempIsMoved);
+                if (currentTool is King)
+                    ((King)currentTool).setIsMoved(tempIsMoved);
+                if (currentTool is Pawn)
+                    ((Pawn)currentTool).setNumberOfTimesMoved(((Pawn)currentTool).getNumberOfTimesMoved() - 1);
+                return false;
+            }
+            Console.WriteLine(boardGame);
+            return true;
         }
     }
     class Board
@@ -268,50 +364,6 @@ namespace CHECKMATE
         public void setLastToolMoved(Tool tool) { lastToolMoved = tool; }
         public Tool getToolInCell(char currentLetter, int currentDigit) { return board[currentDigit - 1, currentLetter - 'A']; }
         public void setToolInCell(char letter, int digit, Tool tool) { board[digit - 1, letter - 'A'] = tool; }
-        // Return false on failure
-        public bool moveTool(Board boardGame, char currentLetter, int currentDigit, char nextLetter, int nextDigit, bool color)
-        {
-            bool tempIsMoved = false;
-            if (currentLetter < 'A' || currentLetter > 'H' || nextLetter < 'A' || nextLetter > 'H')
-                return false;
-            if (currentDigit < 0 || currentDigit > 8 || nextDigit < 0 || nextDigit > 8)
-                return false;
-            Tool currentTool = this.getToolInCell(currentLetter, currentDigit);
-            if (currentTool == null)
-                return false;
-            if (boardGame.getToolInCell(nextLetter, nextDigit) != null)
-            {
-                if (boardGame.getToolInCell(currentLetter, currentDigit).getColor() == boardGame.getToolInCell(nextLetter, nextDigit).getColor())
-                    return false;
-            }
-            if (boardGame.getToolInCell(currentLetter, currentDigit).getColor() != color)
-                return false;
-            if (!currentTool.isMoveLegal(boardGame, currentLetter, currentDigit, nextLetter, nextDigit))
-                return false;
-            if (isStillInChessMode(boardGame, currentLetter, currentDigit, nextLetter, nextDigit, color))
-                return false;
-            Tool lastToolSave = lastToolMoved;
-            if (currentTool is Rook)
-                tempIsMoved = ((Rook)currentTool).getIsMoved();
-            if (currentTool is King)
-                tempIsMoved = ((King)currentTool).getIsMoved();
-            currentTool.MoveTool(boardGame, currentLetter, currentDigit, nextLetter, nextDigit);
-            lastToolMoved = currentTool;
-            if (GamePlay.isChess(boardGame, color))
-            {
-                currentTool.MoveTool(boardGame, nextLetter, nextDigit, currentLetter, currentDigit);
-                lastToolMoved = lastToolSave;
-                if (currentTool is Rook)
-                    ((Rook)currentTool).setIsMoved(tempIsMoved);
-                if (currentTool is King)
-                    ((King)currentTool).setIsMoved(tempIsMoved);
-                if (currentTool is Pawn)
-                    ((Pawn)currentTool).setNumberOfTimesMoved(((Pawn)currentTool).getNumberOfTimesMoved() - 1);
-                return false;
-            }
-            Console.WriteLine(boardGame);
-            return true;
-        }
         public bool checkInput(string input)
         {
             if (input == null)
@@ -324,37 +376,13 @@ namespace CHECKMATE
                 return false;
             return true;
         }
-        public bool isStillInChessMode(Board boardGame, char currentLetter, int currentDigit, char nextLetter, int nextDigit, bool color)
+        public Board copy()
         {
-            Tool lastToolSave, toolEaten;
-            bool tempIsMoved = false;
-            bool result = false;
-            string tempLocation = "";
-            int tempCounter;
-            //hold all data to restore and move the tool
-            lastToolSave = getLastToolMoved();
-            tempLocation = getToolInCell(currentLetter, currentDigit).getLocation();
-            if (getToolInCell(currentLetter, currentDigit) is Rook)
-                tempIsMoved = ((Rook)getToolInCell(currentLetter, currentDigit)).getIsMoved();
-            if (getToolInCell(currentLetter, currentDigit) is King)
-                tempIsMoved = ((King)getToolInCell(currentLetter, currentDigit)).getIsMoved();
-            toolEaten = getToolInCell(nextLetter, nextDigit);
-            tempCounter = GamePlay.getCounter();
-            getToolInCell(currentLetter, currentDigit).MoveTool(boardGame, currentLetter, currentDigit, nextLetter, nextDigit);
-            //check if still chess
-            result = GamePlay.isChess(boardGame, color);
-            //bringing everything back
-            getToolInCell(nextLetter, nextDigit).MoveTool(boardGame, nextLetter, nextDigit, currentLetter, currentDigit);
-            GamePlay.setCounter(tempCounter);
-            setToolInCell(nextLetter, nextDigit, toolEaten);
-            setLastToolMoved(lastToolSave);
-            getToolInCell(currentLetter, currentDigit).setLocation(tempLocation);
-            if (getToolInCell(currentLetter, currentDigit) is Rook)
-                ((Rook)getToolInCell(currentLetter, currentDigit)).setIsMoved(tempIsMoved);
-            if (getToolInCell(currentLetter, currentDigit) is King)
-                ((King)getToolInCell(currentLetter, currentDigit)).setIsMoved(tempIsMoved);
-            if (getToolInCell(currentLetter, currentDigit) is Pawn)
-                ((Pawn)getToolInCell(currentLetter, currentDigit)).setNumberOfTimesMoved(((Pawn)getToolInCell(currentLetter, currentDigit)).getNumberOfTimesMoved() - 2);
+            Board result = new Board();
+            for(int i=0;i<8;i++)
+                for(int j=0;j<8;j++)
+                      result.board[i,j] = this.board[i,j].copy();
+            result.lastToolMoved=this.lastToolMoved;
             return result;
         }
     }
@@ -378,19 +406,26 @@ namespace CHECKMATE
         {
             board.getToolInCell(currentLetter, currentDigit).setLocation(nextLetter + "" + nextDigit);
             if (board.getToolInCell(currentLetter, currentDigit) is Pawn)
-                GamePlay.setCounter(GamePlay.getCounter() + 1);
+                GamePlay.setCounterUpTo50Moves(GamePlay.getCounterUpTo50Moves() + 1);
             else
             {
                 if (GamePlay.isEaten(board, currentLetter, currentDigit, nextLetter, nextDigit))
-                    GamePlay.setCounter(0);
+                    GamePlay.setCounterUpTo50Moves(0);
                 else
-                    GamePlay.setCounter(GamePlay.getCounter() + 1);
+                    GamePlay.setCounterUpTo50Moves(GamePlay.getCounterUpTo50Moves() + 1);
             }
         }
         public void changeCells(Board board, char currentLetter, int currentDigit, char nextLetter, int nextDigit, Tool currentTool)
         {
             board.setToolInCell(nextLetter, nextDigit, currentTool);
             board.setToolInCell(currentLetter, currentDigit, null);
+        }
+        public Tool copy()
+        {
+            Tool result=new Tool();
+            result.color=this.color;
+            result.location=this.location;
+            return result;
         }
     }
     class Pawn : Tool
@@ -402,7 +437,7 @@ namespace CHECKMATE
         public override string ToString() { return base.ToString() + "P"; }
         public override void MoveTool(Board board, char currentLetter, int currentDigit, char nextLetter, int nextDigit)
         {
-            Tool tempTool = new Tool();
+            Tool tempTool;
             //promotion check/move
             tempTool = promotion(nextLetter, nextDigit);
             if (numberOfTimesMoved != 0 && tempTool != null)
@@ -468,7 +503,16 @@ namespace CHECKMATE
                 else
                 {
                     if (enPassant(board, currentLetter, currentDigit, nextLetter, nextDigit))
+                    {
+                        Tool lastToolMoved = board.getLastToolMoved();
+                        string location = lastToolMoved.getLocation();
+                        if (location == null)
+                            return false;
+                        char lastToolLetter = location[0];
+                        int lastToolDigit = int.Parse(location[1] + "");
+                        board.setToolInCell(lastToolLetter, lastToolDigit, null);
                         return true;
+                    }
                 }
                 return false;
             }
@@ -502,7 +546,6 @@ namespace CHECKMATE
                 return false;
             if ((color && currentDigit != 4) || (!color && currentDigit != 5))
                 return false;
-            board.setToolInCell(lastToolLetter, lastToolDigit, null);
             return true;
         }
         public Tool promotion(int nextLetter, int nextDigit)
@@ -511,7 +554,7 @@ namespace CHECKMATE
             Tool tool;
             if ((color && nextDigit == 1) || (!color && nextDigit == 8))
             {
-                do
+                while(true)
                 {
                     Console.WriteLine("Congrats your pawn can be promoted, please enter the tool you want : (Q for queen,N for knight,R for rook,B for bishop,P for pawn)");
                     input = Console.ReadLine();
@@ -542,7 +585,7 @@ namespace CHECKMATE
                     }
                     else
                         Console.WriteLine("wrong input, please try again :");
-                } while (true);
+                }
             }
             return null;
         }
@@ -775,7 +818,8 @@ namespace CHECKMATE
         }
     }
 }
-/* board = new Tool[,] {
+/* a board for checking stalemate
+ * board = new Tool[,] {
                                 {null, null, new King(false, "C1"), null, null, null, null, null},
                                 {null, null, null, null, null, null, null, null},
                                 {null,null,null,null,null,null,null,null},
